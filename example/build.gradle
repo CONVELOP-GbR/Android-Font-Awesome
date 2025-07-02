@@ -1,6 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
+    namespace 'info.androidhive.fontawesome.example'
     compileSdkVersion 28
     defaultConfig {
         applicationId "info.androidhive.fontawesome.example"

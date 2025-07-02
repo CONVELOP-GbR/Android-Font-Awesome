@@ -1,5 +1,4 @@
 apply plugin: 'com.android.library'
-apply plugin: 'com.jfrog.artifactory'
 apply plugin: 'maven-publish'
 
 def packageName = 'info.androidhive'
@@ -12,76 +11,23 @@ tasks.withType(org.gradle.api.tasks.javadoc.Javadoc) {
     options.encoding = 'UTF-8'
 }
 
-publishing {
-    publications {
-        aar(MavenPublication) {
-            groupId packageName
-            version = libraryVersion
-            artifactId project.getName()
+def githubProperties = new Properties()
+githubProperties.load(new FileInputStream(rootProject.file("github.properties")))
 
-            pom.withXml {
-                def dependencies = asNode().appendNode('dependencies')
-                configurations.getByName("releaseCompileClasspath").getResolvedConfiguration().getFirstLevelModuleDependencies().each {
-                    def dependency = dependencies.appendNode('dependency')
-                    dependency.appendNode('groupId', it.moduleGroup)
-                    dependency.appendNode('artifactId', it.moduleName)
-                    dependency.appendNode('version', it.moduleVersion)
-                }
-            }
-
-            task androidJavadocs(type: Javadoc) {
-                failOnError false
-                source = android.sourceSets.main.java.srcDirs
-                // encoding = 'UTF-8'
-                classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
-            }
-
-            task androidJavadocsJar(type: Jar, dependsOn: androidJavadocs) {
-                classifier = 'javadoc'
-                // encoding = 'UTF-8'
-                from androidJavadocs.destinationDir
-            }
-
-            task androidSourcesJar(type: Jar) {
-                classifier = 'sources'
-                from android.sourceSets.main.java.sourceFiles
-            }
-
-            artifacts {
-                archives androidSourcesJar
-                archives androidJavadocsJar
-            }
-
-            // Tell maven to prepare the generated "*.aar" file for publishing
-            artifact("$buildDir/outputs/aar/${project.getName()}-release.aar")
-            artifact androidJavadocsJar
-            artifact androidSourcesJar
-        }
-    }
+def getVersionName = { ->
+    return "1.0.0"
 }
 
-artifactory {
-    contextUrl = 'http://localhost:8081/artifactory'
-    publish {
-        repository {
-            repoKey = 'androidhive-maven'
-            username = artifactory_username
-            password = artifactory_password
-        }
-        defaults {
-            publications('aar')
-            publishArtifacts = true
-            properties = ['qa.level': 'basic', 'dev.team': 'core']
-            publishPom = true
-        }
-    }
+def getArtificatId = { ->
+    return "fontawesome"
 }
 
 android {
-    compileSdkVersion 28
+    namespace 'info.androidhive.fontawesome'
+    compileSdkVersion 36
     defaultConfig {
         minSdkVersion 15
-        targetSdkVersion 28
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
 
@@ -105,6 +51,39 @@ android {
         exclude 'META-INF/license.txt'
     }
 
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+
+}
+
+afterEvaluate {
+    publishing {
+        publishing {
+            publications {
+                releaseAndroidLibrary(MavenPublication) {
+                    from components.release
+                    groupId 'info.androidhive'
+                    artifactId getArtificatId()
+                    version getVersionName()
+
+                }
+            }
+
+            repositories {
+                maven {
+                    name = "GitHubPackages"
+                    url = uri("https://maven.pkg.github.com/CONVELOP-GbR/Android-Font-Awesome")
+                    credentials {
+                        username = githubProperties['gpr.usr'] ?: System.getenv("GPR_USER")
+                        password = githubProperties['gpr.key'] ?: System.getenv("GPR_API_KEY")
+                    }
+                }
+            }
+        }
+    }
 }
 
 dependencies {
@@ -114,4 +93,9 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+}
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
